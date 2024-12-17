@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid'
 import type { Presentation, PresentationElement } from '../types/presentation'
 import { storage } from '../utils/storage'
 import TextEditor from './editor/TextEditor.vue'
+import ImageUpload from './ImageUpload.vue'
 
 const props = defineProps<{
   presentation: Presentation
@@ -38,6 +39,7 @@ watch(() => props.presentation.name, (newName) => {
 })
 
 const elements = ref<PresentationElement[]>(props.presentation.elements)
+const showImageUpload = ref(false)
 
 watch(elements, (newElements) => {
   const updatedPresentation: Presentation = {
@@ -50,12 +52,15 @@ watch(elements, (newElements) => {
 }, { deep: true })
 
 const addElement = (type: 'text' | 'image') => {
+  if (type === 'image') {
+    showImageUpload.value = true
+    return
+  }
   elements.value.push({
     id: nanoid(),
     type,
-    content: type === 'text' ? 'New Text' : 'https://placeholder.com/300',
-    sequence: elements.value.length + 1,
-    fontSize: type === 'text' ? 100 : undefined
+    content: type === 'text' ? 'New Text' : '',
+    sequence: elements.value.length + 1
   })
 }
 
@@ -100,6 +105,19 @@ const updateSequence = () => {
         Add Image
       </button>
     </div>
+
+    <ImageUpload
+      v-if="showImageUpload"
+      @imageUploaded="(url) => {
+        elements.value.push({
+          id: nanoid(),
+          type: 'image',
+          content: url,
+          sequence: elements.value.length + 1
+        });
+        showImageUpload.value = false;
+      }"
+    />
 
     <draggable
       v-model="elements"
