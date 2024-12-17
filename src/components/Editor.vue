@@ -14,6 +14,29 @@ const emit = defineEmits<{
   (e: 'update', presentation: Presentation): void
 }>()
 
+const presentationName = ref(props.presentation.name)
+const isEditing = ref(false)
+
+const handleBlur = () => {
+  isEditing.value = false
+  updateName()
+}
+
+const updateName = () => {
+  if (presentationName.value.trim() !== props.presentation.name) {
+    const updatedPresentation = {
+      ...props.presentation,
+      name: presentationName.value.trim()
+    }
+    storage.savePresentation(updatedPresentation)
+    emit('update', updatedPresentation)
+  }
+}
+
+watch(() => props.presentation.name, (newName) => {
+  presentationName.value = newName
+})
+
 const elements = ref<PresentationElement[]>(props.presentation.elements)
 
 watch(elements, (newElements) => {
@@ -53,7 +76,17 @@ const updateSequence = () => {
 <template>
   <div class="editor-container p-4">
     <div class="toolbar mb-4">
-      <h1 class="text-2xl font-bold mb-4">{{ presentation.name }}</h1>
+      <div class="flex items-center gap-2 mb-4">
+        <input
+          type="text"
+          v-model="presentationName"
+          @blur="handleBlur"
+          @keyup.enter="updateName"
+          class="text-2xl font-bold px-2 py-1 border rounded"
+          :class="{ 'border-transparent': !isEditing }"
+          @focus="isEditing = true"
+        />
+      </div>
       <button
         class="px-4 py-2 bg-blue-500 text-white rounded mr-2"
         @click="addElement('text')"

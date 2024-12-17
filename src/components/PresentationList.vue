@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { storage } from '../utils/storage'
 import { nanoid } from 'nanoid'
 import FileOperations from './FileOperations.vue'
@@ -7,6 +7,9 @@ import type { Presentation } from '../types/presentation'
 
 const presentations = ref<Presentation[]>([])
 const fileOperationsRef = ref<InstanceType<typeof FileOperations> | null>(null)
+const editingId = ref<string | null>(null)
+const editingName = ref('')
+const editInput = ref<HTMLInputElement | null>(null)
 
 const emit = defineEmits<{
   (e: 'select', presentation: Presentation): void
@@ -45,6 +48,33 @@ const loadPresentations = () => {
   presentations.value = storage.getAllPresentations()
 }
 
+const startEditing = (id: string) => {
+  const presentation = presentations.value.find(p => p.id === id)
+  if (presentation) {
+    editingId.value = id
+    editingName.value = presentation.name
+    nextTick(() => {
+      editInput.value?.focus()
+    })
+  }
+}
+
+const saveEdit = () => {
+  if (editingId.value) {
+    const presentation = presentations.value.find(p => p.id === editingId.value)
+    if (presentation && editingName.value.trim()) {
+      presentation.name = editingName.value.trim()
+      storage.savePresentation(presentation)
+      loadPresentations()
+    }
+    editingId.value = null
+  }
+}
+
+const cancelEdit = () => {
+  editingId.value = null
+}
+
 onMounted(loadPresentations)
 </script>
 
@@ -80,10 +110,23 @@ onMounted(loadPresentations)
         class="flex items-center justify-between p-3 bg-white rounded shadow-sm hover:shadow-md transition-shadow"
       >
         <div>
-          <h3 class="font-medium">{{ presentation.name }}</h3>
-          <p class="text-sm text-gray-500">
-            Last modified: {{ new Date(presentation.lastModified).toLocaleDateString() }}
-          </p>
+          <div v-if="!editingId || editingId !== presentation.id">
+            <h3 class="font-medium cursor-pointer hover:text-blue-600" @click="startEditing(presentation.id)">{{ presentation.name }}</h3>
+            <p class="text-sm text-gray-500">
+              Last modified: {{ new Date(presentation.lastModified).toLocaleDateString() }}
+            </p>
+          </div>
+          <div v-else class="flex items-center gap-2">
+            <input
+              type="text"
+              v-model="editingName"
+              @blur="saveEdit"
+              @keyup.enter="saveEdit"
+              @keyup.esc="cancelEdit"
+              class="border rounded px-2 py-1 font-medium"
+              ref="editInput"
+            />
+          </div>
         </div>
         <div class="space-x-2">
           <button
