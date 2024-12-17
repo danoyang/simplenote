@@ -1,0 +1,13 @@
+/* Import Alibaba PuHuiTi font */
+@font-face {
+  font-family: 'Alibaba PuHuiTi';
+  src: url('//at.alicdn.com/t/webfont_6ljp4edqayw.eot');
+  src: url('//at.alicdn.com/t/webfont_6ljp4edqayw.eot?#iefix') format('embedded-opentype'),
+       url('//at.alicdn.com/t/webfont_6ljp4edqayw.woff2') format('woff2'),
+       url('//at.alicdn.com/t/webfont_6ljp4edqayw.woff') format('woff'),
+       url('//at.alicdn.com/t/webfont_6ljp4edqayw.ttf') format('truetype');
+}
+
+:root {
+  --font-primary: 'Alibaba PuHuiTi', system-ui, -apple-system, sans-serif;
+}
