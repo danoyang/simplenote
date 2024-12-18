@@ -5,6 +5,8 @@ import { nanoid } from 'nanoid'
 import type { Presentation, PresentationElement } from '../types/presentation'
 import { storage } from '../utils/storage'
 import TextEditor from './editor/TextEditor.vue'
+import ImageUpload from './ImageUpload.vue'
+import ImageUrlModal from './ImageUrlModal.vue'
 
 const props = defineProps<{
   presentation: Presentation
@@ -14,7 +16,32 @@ const emit = defineEmits<{
   (e: 'update', presentation: Presentation): void
 }>()
 
-const elements = ref<PresentationElement[]>(props.presentation.elements)
+const presentationName = ref(props.presentation.name)
+const isEditing = ref(false)
+
+const handleBlur = () => {
+  isEditing.value = false
+  updateName()
+}
+
+const updateName = () => {
+  if (presentationName.value.trim() !== props.presentation.name) {
+    const updatedPresentation = {
+      ...props.presentation,
+      name: presentationName.value.trim()
+    }
+    storage.savePresentation(updatedPresentation)
+    emit('update', updatedPresentation)
+  }
+}
+
+watch(() => props.presentation.name, (newName) => {
+  presentationName.value = newName
+})
+
+const elements = ref<PresentationElement[]>(props.presentation.elements || [])
+const showImageUpload = ref(false)
+const showImageUrlModal = ref(false)
 
 watch(elements, (newElements) => {
   const updatedPresentation: Presentation = {
@@ -27,13 +54,40 @@ watch(elements, (newElements) => {
 }, { deep: true })
 
 const addElement = (type: 'text' | 'image') => {
+  if (type === 'image') {
+    console.log('Setting showImageUpload to true')
+    showImageUpload.value = true
+    showImageUrlModal.value = false  // Ensure URL modal is closed
+    console.log('Current modal states:', { showImageUpload: showImageUpload.value, showImageUrlModal: showImageUrlModal.value })
+    return
+  }
+  if (!Array.isArray(elements.value)) {
+    elements.value = []
+  }
   elements.value.push({
     id: nanoid(),
     type,
-    content: type === 'text' ? 'New Text' : 'https://placeholder.com/300',
-    sequence: elements.value.length + 1,
-    fontSize: type === 'text' ? 100 : undefined
+    content: 'New Text',
+    sequence: (elements.value.length || 0) + 1
   })
+}
+
+const handleImageUrl = (url: string) => {
+  if (!Array.isArray(elements.value)) {
+    elements.value = []
+  }
+  elements.value.push({
+    id: nanoid(),
+    type: 'image',
+    content: url,
+    sequence: (elements.value.length || 0) + 1
+  })
+  showImageUrlModal.value = false
+}
+
+const handleImageUrlCancel = () => {
+  showImageUrlModal.value = false
+  showImageUpload.value = true
 }
 
 const updateElement = (element: PresentationElement) => {
@@ -53,7 +107,17 @@ const updateSequence = () => {
 <template>
   <div class="editor-container p-4">
     <div class="toolbar mb-4">
-      <h1 class="text-2xl font-bold mb-4">{{ presentation.name }}</h1>
+      <div class="flex items-center gap-2 mb-4">
+        <input
+          type="text"
+          v-model="presentationName"
+          @blur="handleBlur"
+          @keyup.enter="updateName"
+          class="text-2xl font-bold px-2 py-1 border rounded"
+          :class="{ 'border-transparent': !isEditing }"
+          @focus="isEditing = true"
+        />
+      </div>
       <button
         class="px-4 py-2 bg-blue-500 text-white rounded mr-2"
         @click="addElement('text')"
@@ -84,18 +148,47 @@ const updateSequence = () => {
                 :element="element"
                 @update="updateElement"
               />
-              <input
-                v-else
-                v-model="element.content"
-                type="url"
-                placeholder="Image URL"
-                class="w-full border p-2 rounded"
-              >
+              <div v-else class="image-container">
+                <img
+                  :src="element.content"
+                  :alt="'Image ' + element.sequence"
+                  class="max-w-full h-auto rounded shadow-sm"
+                  @error="(e) => e.target.classList.add('error')"
+                />
+              </div>
             </div>
           </div>
         </div>
       </template>
     </draggable>
+
+    <!-- Move modals outside the main container for proper z-index stacking -->
+    <ImageUrlModal
+      v-if="showImageUrlModal"
+      @urlSubmitted="handleImageUrl"
+      @close="handleImageUrlCancel"
+    />
+
+    <ImageUpload
+      v-if="showImageUpload"
+      @imageUploaded="(url) => {
+        if (!Array.isArray(elements.value)) {
+          elements.value = []
+        }
+        elements.value.push({
+          id: nanoid(),
+          type: 'image',
+          content: url,
+          sequence: (elements.value.length || 0) + 1
+        })
+        showImageUpload.value = false
+      }"
+      @close="() => { showImageUpload.value = false }"
+      @switchToUrl="() => {
+        showImageUpload.value = false
+        showImageUrlModal.value = true
+      }"
+    />
   </div>
 </template>
 
@@ -118,5 +211,15 @@ const updateSequence = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.image-container {
+  max-width: 100%;
+  margin: 1rem 0;
+}
+
+.image-container img.error {
+  border: 2px solid #ef4444;
+  padding: 0.5rem;
 }
 </style>
