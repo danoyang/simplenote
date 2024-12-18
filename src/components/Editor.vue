@@ -6,6 +6,7 @@ import type { Presentation, PresentationElement } from '../types/presentation'
 import { storage } from '../utils/storage'
 import TextEditor from './editor/TextEditor.vue'
 import ImageUpload from './ImageUpload.vue'
+import ImageUrlModal from './ImageUrlModal.vue'
 
 const props = defineProps<{
   presentation: Presentation
@@ -38,8 +39,9 @@ watch(() => props.presentation.name, (newName) => {
   presentationName.value = newName
 })
 
-const elements = ref<PresentationElement[]>(props.presentation.elements)
+const elements = ref<PresentationElement[]>(props.presentation.elements || [])
 const showImageUpload = ref(false)
+const showImageUrlModal = ref(false)
 
 watch(elements, (newElements) => {
   const updatedPresentation: Presentation = {
@@ -53,15 +55,39 @@ watch(elements, (newElements) => {
 
 const addElement = (type: 'text' | 'image') => {
   if (type === 'image') {
+    console.log('Setting showImageUpload to true')
     showImageUpload.value = true
+    showImageUrlModal.value = false  // Ensure URL modal is closed
+    console.log('Current modal states:', { showImageUpload: showImageUpload.value, showImageUrlModal: showImageUrlModal.value })
     return
+  }
+  if (!Array.isArray(elements.value)) {
+    elements.value = []
   }
   elements.value.push({
     id: nanoid(),
     type,
-    content: type === 'text' ? 'New Text' : '',
-    sequence: elements.value.length + 1
+    content: 'New Text',
+    sequence: (elements.value.length || 0) + 1
   })
+}
+
+const handleImageUrl = (url: string) => {
+  if (!Array.isArray(elements.value)) {
+    elements.value = []
+  }
+  elements.value.push({
+    id: nanoid(),
+    type: 'image',
+    content: url,
+    sequence: (elements.value.length || 0) + 1
+  })
+  showImageUrlModal.value = false
+}
+
+const handleImageUrlCancel = () => {
+  showImageUrlModal.value = false
+  showImageUpload.value = true
 }
 
 const updateElement = (element: PresentationElement) => {
@@ -106,19 +132,6 @@ const updateSequence = () => {
       </button>
     </div>
 
-    <ImageUpload
-      v-if="showImageUpload"
-      @imageUploaded="(url) => {
-        elements.value.push({
-          id: nanoid(),
-          type: 'image',
-          content: url,
-          sequence: elements.value.length + 1
-        });
-        showImageUpload.value = false;
-      }"
-    />
-
     <draggable
       v-model="elements"
       class="elements-list"
@@ -135,18 +148,47 @@ const updateSequence = () => {
                 :element="element"
                 @update="updateElement"
               />
-              <input
-                v-else
-                v-model="element.content"
-                type="url"
-                placeholder="Image URL"
-                class="w-full border p-2 rounded"
-              >
+              <div v-else class="image-container">
+                <img
+                  :src="element.content"
+                  :alt="'Image ' + element.sequence"
+                  class="max-w-full h-auto rounded shadow-sm"
+                  @error="(e) => e.target.classList.add('error')"
+                />
+              </div>
             </div>
           </div>
         </div>
       </template>
     </draggable>
+
+    <!-- Move modals outside the main container for proper z-index stacking -->
+    <ImageUrlModal
+      v-if="showImageUrlModal"
+      @urlSubmitted="handleImageUrl"
+      @close="handleImageUrlCancel"
+    />
+
+    <ImageUpload
+      v-if="showImageUpload"
+      @imageUploaded="(url) => {
+        if (!Array.isArray(elements.value)) {
+          elements.value = []
+        }
+        elements.value.push({
+          id: nanoid(),
+          type: 'image',
+          content: url,
+          sequence: (elements.value.length || 0) + 1
+        })
+        showImageUpload.value = false
+      }"
+      @close="() => { showImageUpload.value = false }"
+      @switchToUrl="() => {
+        showImageUpload.value = false
+        showImageUrlModal.value = true
+      }"
+    />
   </div>
 </template>
 
@@ -169,5 +211,15 @@ const updateSequence = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.image-container {
+  max-width: 100%;
+  margin: 1rem 0;
+}
+
+.image-container img.error {
+  border: 2px solid #ef4444;
+  padding: 0.5rem;
 }
 </style>
